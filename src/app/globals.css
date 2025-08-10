@@ -117,40 +117,23 @@
   --chart-5: oklch(0.7 0.15 0);
 }
 
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+    /* Aesthetic Background Additions removed */
+  }
+
+  .dark body {
+    /* Dark mode background additions removed */
   }
 }
-
 
 .headerBtnHover:hover{
   background-color:#8200db;
 }
-
-@keyframes pop {
-  0% { transform: translate(-50%, -50%) scale(1); }
-  50% { transform: translate(-50%, -50%) scale(1.3); }
-  100% { transform: translate(-50%, -50%) scale(1.25); } 
-}
-
-.animate-pop {
-  animation: pop 0.3s ease-out;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
 
 @keyframes pop {
   0% { transform: scale(1); }
@@ -171,23 +154,30 @@
   animation: spin 1s linear infinite;
 }
 
-
-
-
-@keyframes spin-slow {   /* For globe of authrequired dialog*/
+/* Animations for travel theme icons */
+@keyframes spin-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
 .animate-spin-slow {
-  animation: spin-slow 10s linear infinite; /
+  animation: spin-slow 10s linear infinite; /* Slower spin for globe */
 }
 
 @keyframes bounce-horizontal {
   0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(8px); }
+  50% { transform: translateX(8px); } /* Adjust bounce distance as needed */
 }
 
 .animate-bounce-horizontal {
-  animation: bounce-horizontal 1.8s ease-in-out infinite;
+  animation: bounce-horizontal 1.8s ease-in-out infinite; /* Slower bounce for subtle effect */
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
 }
