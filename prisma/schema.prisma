@@ -1,0 +1,50 @@
+
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+
+// 1. User Model
+model User {
+ 
+  id        String   @id @default(cuid())
+  supabaseId String  @unique  //we will get this from supabase Auth
+  username  String    @unique
+  firstTime Boolean  @default(true) //this is to show Intro cards to first time user
+  createdAt DateTime @default(now())
+  posts     Post[]
+}
+
+// 2. Location Model  (For story feature like in Instagram)
+model Location {
+  id    String @id @default(cuid())
+  name  String @unique
+  
+  posts Post[]
+}
+
+// 3. Post Model
+model Post {
+  id         String   @id @default(cuid())
+  imageUrl   String
+  caption    String?  //we make it optional to improve user experience whether he want a caption or not
+  likes      Int      @default(0)
+  shares     Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  author     User     @relation(fields: [authorId], references: [id])
+  authorId   String
+  
+  location   Location @relation(fields: [locationId], references: [id])
+  locationId String
+
+  @@index([createdAt]) //as feed needs to sorted in descending order
+}
