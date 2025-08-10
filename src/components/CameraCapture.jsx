@@ -1,49 +1,19 @@
+
 'use client';
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, X, Check, Upload, Loader2, RotateCw } from 'lucide-react'; // Added Loader2 and RotateCw for better feedback
+import { Camera, X, Check, Upload, Loader2, RotateCw } from 'lucide-react';
 
-export const CameraCapture = ({ onCapture, onClose }) => {
+export const ImagePicker = ({ onFileSelected, onClose, open }) => {
   const [stream, setStream] = useState(null);
-  const [capturedImage, setCapturedImage] = useState(null); // URL of the captured/uploaded image
-  const [capturedFile, setCapturedFile] = useState(null); // File object of the captured/uploaded image
-  const [caption, setCaption] = useState('');
-  const [location, setLocation] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [isCameraActive, setIsCameraActive] = useState(false); // New state to manage camera active status
-  const [cameraLoading, setCameraLoading] = useState(false); // To show loading state for camera
+  const [capturedImageBlob, setCapturedImageBlob] = useState(null); // Stores the blob URL for preview
+  const [capturedFile, setCapturedFile] = useState(null); // Stores the actual File object to be returned
+  const [isCameraActive, setIsCameraActive] = useState(false); // Indicates if camera stream is actively running
+  const [cameraLoading, setCameraLoading] = useState(false); // Indicates if camera is currently trying to start
   const [facingMode, setFacingMode] = useState('environment'); // 'user' or 'environment'
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
-
-  // Function to start the camera stream
-  const startCamera = useCallback(async () => {
-    setCameraLoading(true); // Indicate camera is starting
-    try {
-      // Stop any existing tracks before starting new ones
-      stopCamera();
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: facingMode, // Use state for facing mode
-          width: { ideal: 1280 }, // Optimize resolution for better performance
-          height: { ideal: 720 }
-        }
-      });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-      setIsCameraActive(true);
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('Unable to access camera. Please check permissions or use file upload instead.');
-      setIsCameraActive(false); // Camera could not start
-    } finally {
-      setCameraLoading(false); // Camera loading finished
-    }
-  }, [facingMode]); // Dependency on facingMode
 
   // Function to stop the camera stream
   const stopCamera = useCallback(() => {
@@ -54,6 +24,35 @@ export const CameraCapture = ({ onCapture, onClose }) => {
     setIsCameraActive(false);
   }, [stream]);
 
+  // Function to start the camera stream
+  const startCamera = useCallback(async () => {
+    setCameraLoading(true);
+    // Stop any existing stream before starting a new one
+    stopCamera();
+
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: facingMode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      setIsCameraActive(true); // Camera successfully started
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      alert('Unable to access camera. Please check permissions or use file upload instead.');
+      setIsCameraActive(false); // Camera could not start
+      onClose(); // Automatically close the picker if camera access fails
+    } finally {
+      setCameraLoading(false); // Loading process finished
+    }
+  }, [facingMode, onClose, stopCamera]); // Added stopCamera to dependencies
+
   // Handler for capturing a photo from the video stream
   const capturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
@@ -62,20 +61,18 @@ export const CameraCapture = ({ onCapture, onClose }) => {
       const context = canvas.getContext('2d');
 
       if (context) {
-        // Set canvas dimensions to match video to avoid stretching
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight); // Draw video frame to canvas
+        context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
 
         canvas.toBlob((blob) => {
           if (blob) {
             const file = new File([blob], `vistagram-capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-            const imageUrl = URL.createObjectURL(blob); // Create a URL for display
-            setCapturedImage(imageUrl);
+            setCapturedImageBlob(URL.createObjectURL(blob));
             setCapturedFile(file);
             stopCamera(); // Stop camera after capture
           }
-        }, 'image/jpeg', 0.9); // Quality set to 0.9 for better image
+        }, 'image/jpeg', 0.9);
       }
     }
   };
@@ -84,40 +81,33 @@ export const CameraCapture = ({ onCapture, onClose }) => {
   const handleFileUpload = (event) => {
     const file = event.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      const imageUrl = URL.createObjectURL(file); // Create a URL for display
-      setCapturedImage(imageUrl);
+      setCapturedImageBlob(URL.createObjectURL(file));
       setCapturedFile(file);
-      stopCamera(); // Stop camera if file is uploaded
-    } else if (file && !file.type.startsWith('image/')) {
+      stopCamera(); // Stop camera if a file is uploaded
+    } else if (file) {
       alert('Only image files are allowed.');
     }
-    // Clear the input value so the same file can be selected again if needed
-    event.target.value = null;
+    event.target.value = null; // Clear input to allow re-selection of the same file
   };
 
-  // Handler for submitting the post (uploading image and data)
-  const handleSubmit = async () => {
-    if (capturedFile && caption.trim() && location.trim()) {
-      setIsUploading(true);
-      try {
-        await onCapture(capturedFile, caption, location);
-        onClose(); // Close dialog on successful upload
-      } catch (error) {
-        console.error('Error uploading post:', error);
-        alert('Failed to upload post. Please try again.');
-      } finally {
-        setIsUploading(false);
-      }
+  // Function to confirm selection and pass file to parent
+  const confirmSelection = () => {
+    if (capturedFile) {
+      onFileSelected(capturedFile);
+      // Clean up blob URL immediately after passing the file
+      if (capturedImageBlob) URL.revokeObjectURL(capturedImageBlob);
+      setCapturedImageBlob(null);
+      setCapturedFile(null);
+      onClose(); // Close the picker modal
     }
   };
 
-  // Function to reset the capture process and restart camera
-  const resetCapture = () => {
-    setCapturedImage(null);
+  // Function to reset the capture process (retake/re-upload)
+  const resetPicker = () => {
+    if (capturedImageBlob) URL.revokeObjectURL(capturedImageBlob);
+    setCapturedImageBlob(null);
     setCapturedFile(null);
-    setCaption('');
-    setLocation('');
-    startCamera(); // Restart camera
+    startCamera(); // Restart camera for new capture
   };
 
   // Toggle camera facing mode (front/back)
@@ -125,25 +115,51 @@ export const CameraCapture = ({ onCapture, onClose }) => {
     setFacingMode(prevMode => (prevMode === 'environment' ? 'user' : 'environment'));
   };
 
-  // Start camera on component mount and stop on unmount
+  // Effect to manage camera stream lifecycle
   useEffect(() => {
-    if (!capturedImage) { // Only start camera if no image is captured
+    if (open && !capturedFile) {
+      // Start camera only if the picker is open and no image has been confirmed/selected yet
       startCamera();
     }
-    return () => stopCamera();
-  }, [startCamera, stopCamera, capturedImage]); // Re-run if startCamera or stopCamera changes, or if image state changes
+    // Cleanup function: runs on component unmount or when dependencies change
+    return () => {
+      stopCamera(); // Always stop camera when component is unmounted or `open` becomes false
+      if (capturedImageBlob) URL.revokeObjectURL(capturedImageBlob); // Ensure blob URL is revoked
+    };
+  }, [open, startCamera, stopCamera, capturedFile, capturedImageBlob]); // Dependencies for effect
+
+  if (!open) return null; // Don't render anything if `open` is false
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col md:flex-row h-auto md:h-[600px] font-sans">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col h-auto font-sans">
         
-        {/* Left Section: Camera/Image Preview */}
-        <div className="relative flex-1 bg-gray-900 rounded-t-3xl md:rounded-l-3xl md:rounded-tr-none flex items-center justify-center overflow-hidden">
-          {capturedImage ? (
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b">
+          <h3 className="text-lg font-semibold text-gray-800">Select an Image</h3>
+          <button
+            onClick={() => {
+              // Stop camera and clean up state before closing
+              stopCamera();
+              if (capturedImageBlob) URL.revokeObjectURL(capturedImageBlob);
+              setCapturedImageBlob(null);
+              setCapturedFile(null);
+              onClose(); // Propagate close event to parent
+            }}
+            aria-label="Close"
+            className="p-2 rounded-md hover:bg-gray-100"
+          >
+            <X className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+
+        {/* Content Area: Camera/Image Preview */}
+        <div className="relative flex-1 bg-gray-900 flex items-center justify-center overflow-hidden h-96">
+          {capturedImageBlob ? (
             <img
-              src={capturedImage}
-              alt="Captured Vistagram"
-              className="w-full h-full object-cover"
+              src={capturedImageBlob}
+              alt="Preview"
+              className="w-full h-full object-contain"
             />
           ) : (
             <>
@@ -159,7 +175,8 @@ export const CameraCapture = ({ onCapture, onClose }) => {
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover transform scaleX(-1)" // Flip for selfie mode feedback
+                    className="w-full h-full object-cover"
+                    style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }} // Flip for selfie mode
                   />
                   <canvas ref={canvasRef} className="hidden" />
                 </>
@@ -168,7 +185,7 @@ export const CameraCapture = ({ onCapture, onClose }) => {
           )}
 
           {/* Camera Controls Overlay */}
-          {!capturedImage && (
+          {!capturedImageBlob && ( // Show controls only if no image is captured yet
             <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 flex items-center gap-5 bg-black/40 backdrop-blur-md rounded-full p-3 shadow-lg border border-white/20">
               {/* Upload Button */}
               <input
@@ -189,7 +206,7 @@ export const CameraCapture = ({ onCapture, onClose }) => {
               {/* Capture Button */}
               <button
                 onClick={capturePhoto}
-                disabled={!isCameraActive}
+                disabled={!isCameraActive || cameraLoading} // Disable if camera not active OR loading
                 className="bg-white text-gray-900 p-4 rounded-full hover:bg-gray-100 transition-colors shadow-xl border-2 border-transparent focus:outline-none focus:ring-4 focus:ring-white/70 disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Capture Photo"
               >
@@ -197,88 +214,44 @@ export const CameraCapture = ({ onCapture, onClose }) => {
               </button>
 
               {/* Toggle Camera (Front/Back) */}
-              <button
-                onClick={toggleFacingMode}
-                className="text-white p-2 rounded-full hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
-                aria-label={`Switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}
-              >
-                <RotateCw className="w-6 h-6" />
-              </button>
+              {isCameraActive && ( // Show toggle only if camera is active
+                <button
+                  onClick={toggleFacingMode}
+                  className="text-white p-2 rounded-full hover:bg-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
+                  aria-label={`Switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}
+                >
+                  <RotateCw className="w-6 h-6" />
+                </button>
+              )}
             </div>
           )}
-
-          {/* Close Button on Image Section (Top Right) */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors z-20 focus:outline-none focus:ring-2 focus:ring-white/50"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
-        {/* Right Section: Form for Caption and Location */}
-        {capturedImage && (
-          <div className="md:w-1/2 p-6 md:p-8 flex flex-col justify-between rounded-b-3xl md:rounded-r-3xl md:rounded-bl-none">
-            {/* Form Fields */}
-            <div className="space-y-6 flex-grow">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Share Your Vistagram</h2>
-              
-              <div>
-                <label htmlFor="location" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Location 📍
-                </label>
-                <input
-                  id="location"
-                  type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Where did you capture this moment?"
-                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-gray-800 placeholder-gray-400"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="caption" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Caption ✍️
-                </label>
-                <textarea
-                  id="caption"
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Describe your adventure..."
-                  rows={4}
-                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all resize-none text-gray-800 placeholder-gray-400"
-                />
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-4 mt-6">
-              <button
-                onClick={resetCapture}
-                className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium flex items-center justify-center gap-2"
-              >
-                <RotateCw className="w-5 h-5" /> Retake
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={!caption.trim() || !location.trim() || isUploading}
-                className="flex-1 py-3 px-4 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold flex items-center justify-center gap-2"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-5 h-5" /> Share Post
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Action Buttons (at the bottom of the dialog) */}
+        <div className="p-6 flex justify-end gap-3 border-t">
+            <button
+              type="button"
+              onClick={capturedImageBlob ? resetPicker : () => {
+                // If no image is captured, this acts as a cancel button
+                stopCamera();
+                if (capturedImageBlob) URL.revokeObjectURL(capturedImageBlob);
+                setCapturedImageBlob(null);
+                setCapturedFile(null);
+                onClose();
+              }}
+              className="px-4 py-2 rounded-md border text-sm bg-white hover:bg-gray-50"
+            >
+              {capturedImageBlob ? 'Retake' : 'Cancel'}
+            </button>
+            <button
+              type="button"
+              onClick={confirmSelection}
+              disabled={!capturedFile}
+              className="px-4 py-2 rounded-md text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              <Check className="w-5 h-5" /> Select Image
+            </button>
+        </div>
       </div>
     </div>
   );

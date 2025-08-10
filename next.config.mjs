@@ -7,15 +7,27 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'wallpapers.com', // Add this line
+        hostname: 'wallpapers.com', 
         port: '',
         pathname: '/**',
       },
       {
         protocol: 'https',
-        hostname: 'images.unsplash.com', // Add this line
+        hostname: 'images.unsplash.com', 
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'nibmeunbmqvmfiswsapg.supabase.co', 
+        port: '',
+        pathname: '/**', 
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.pexels.com', 
+        port: '',
+        pathname: '/**', 
       },
     ],
   },

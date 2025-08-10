@@ -1,22 +1,44 @@
-
-
 'use client'
-import { useState, useRef, useEffect } from 'react';
-import { Heart, Share, MapPin, Loader2, Check } from 'lucide-react'; // Removed LinkIcon, MoreHorizontal
-import Image from 'next/image'; // For optimized images
+import { useState, useRef, useEffect, useActionState, useTransition } from 'react';
+import { Heart, Share, MapPin, Loader2, Check } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { likePostAction, sharePostAction } from '@/actions/postActions';
+import { toast } from 'sonner';
+import AuthRequiredDialog from './AuthRequiredDialog';
 
-export default function PostCard({ post, onLike, onShare }) {
-  // State for like and share functionality
-  const [isLiked, setIsLiked] = useState(false);
+export default function PostCard({ post }) {
+  // Initialize states with post props. These will be updated by useEffect on prop changes.
+  const [isLiked, setIsLiked] = useState(post.isLiked);
   const [currentLikes, setCurrentLikes] = useState(post.likes);
   const [currentShares, setCurrentShares] = useState(post.shares);
   const [isSharing, setIsSharing] = useState(false);
-  const [copyStatus, setCopyStatus] = useState(''); // 'copying', 'copied', ''
+  const [copyStatus, setCopyStatus] = useState('');
+  const [postUrl, setPostUrl] = useState('');
+  const [isAuthRequiredDialogOpen, setIsAuthRequiredDialogOpen] = useState(false);
+  const [displayTimestamp, setDisplayTimestamp] = useState(new Date(post.createdAt).toISOString());
+  const [isLikingLoading, setIsLikingLoading] = useState(false); 
 
-  // Ref for the hidden input to facilitate clipboard copy
   const shareLinkRef = useRef(null);
+  const [isPending, startTransition] = useTransition(); 
 
-  // Effect to clear "copied" status after a delay
+  // Server actions
+  const [likeState, formLikeAction] = useActionState(likePostAction, { success: false, error: null, liked: null });
+  const [shareState, formShareAction] = useActionState(sharePostAction, { success: false, error: null });
+
+
+  // This useEffect ensures that local state (isLiked, currentLikes)
+  // is always in sync with the 'post' prop after re-renders (e.g., due to revalidatePath).
+  useEffect(() => {
+    setIsLiked(post.isLiked);
+    setCurrentLikes(post.likes);
+    setCurrentShares(post.shares); // Also sync shares on prop update
+    if (typeof window !== 'undefined') {
+      setPostUrl(`${window.location.origin}/post/${post.id}`);
+      setDisplayTimestamp(formatTimestamp(post.createdAt));
+    }
+  }, [post]); 
+
   useEffect(() => {
     if (copyStatus === 'copied') {
       const timer = setTimeout(() => setCopyStatus(''), 2000);
@@ -24,49 +46,77 @@ export default function PostCard({ post, onLike, onShare }) {
     }
   }, [copyStatus]);
 
-  // Handler for liking/unliking a post
+  useEffect(() => {
+    if (likeState.success === true) {
+   
+      setIsLiked(likeState.liked);
+     
+      toast.success(likeState.liked ? 'Post liked!' : 'Post unliked!');
+    } else if (likeState.success === false && likeState.error) {
+     
+      if (likeState.error.message === 'Authentication required to like posts.') {
+        setIsAuthRequiredDialogOpen(true);
+      } else {
+        toast.error(likeState.error.message);
+      }
+    }
+    setIsLikingLoading(false); 
+  }, [likeState]);
+
+  // Handle response from sharePostAction
+  useEffect(() => {
+    if (shareState.success) {
+      // No need to manually increment here, as 'post' prop will update from revalidatePath
+      toast.success('Post shared!');
+    } else if (shareState.error) {
+      toast.error(shareState.error.message);
+    }
+  }, [shareState]);
+
+  // Handle Like/Unlike action
   const handleLike = () => {
-    const newLikedState = !isLiked;
-    setIsLiked(newLikedState);
-    setCurrentLikes(prev => (newLikedState ? prev + 1 : prev - 1));
-    if (onLike) onLike(post.id, newLikedState);
+    setIsLikingLoading(true); // Start loading immediately
+    
+    startTransition(async () => {
+      formLikeAction(post.id);
+    });
   };
 
-  // Handler for sharing a post (Web Share API or clipboard fallback)
+  // Handle Share action
   const handleShare = async () => {
     setIsSharing(true);
     setCopyStatus('copying');
     try {
-      const postUrl = `${window.location.origin}/post/${post.id}`; // Construct actual post URL
-
       if (navigator.share) {
-        // Use Web Share API if available for native sharing
         await navigator.share({
           title: `Discover ${post.location.name} on Vistagram!`,
           text: post.caption,
           url: postUrl,
         });
-        setCurrentShares(prev => prev + 1);
-        if (onShare) onShare(post.id);
-        setCopyStatus(''); // Clear status on successful native share
+        startTransition(() => {
+            formShareAction(post.id);
+        });
+        setCopyStatus('');
       } else {
-        // Fallback to clipboard copy if Web Share API is not supported
         if (shareLinkRef.current) {
           await navigator.clipboard.writeText(postUrl);
-          setCurrentShares(prev => prev + 1);
-          if (onShare) onShare(post.id);
-          setCopyStatus('copied'); // Indicate successful copy
+          startTransition(() => {
+            formShareAction(post.id);
+          });
+          setCopyStatus('copied');
+        } else {
+            console.warn('shareLinkRef.current is null, cannot copy to clipboard.');
+            toast.error('Failed to copy link. Element not available.');
         }
       }
     } catch (error) {
       console.error('Share cancelled or failed:', error);
-      setCopyStatus(''); // Clear status on cancellation or failure
+      setCopyStatus('');
     } finally {
       setIsSharing(false);
     }
   };
 
-  // Function to format timestamp to a human-readable "X [unit] ago" format
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -80,7 +130,6 @@ export default function PostCard({ post, onLike, onShare }) {
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) return `${diffInDays}d ago`;
     
-    // For older posts, show relative week or full date
     const diffInWeeks = Math.floor(diffInDays / 7);
     if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
 
@@ -92,107 +141,122 @@ export default function PostCard({ post, onLike, onShare }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8 max-w-4xl mx-auto transform transition-all duration-300 hover:shadow-xl relative group font-sans">
-      {/* Container for horizontal split on desktop, vertical on mobile */}
-      <div className="flex flex-col md:flex-row h-auto md:h-[400px]">
-        
-        {/* Image Section (Left Half on Desktop, Top Half on Mobile) */}
-        <div className="w-full md:w-1/2 h-64 md:h-full relative overflow-hidden">
-          <Image
-            src={post.imageUrl}
-            alt={post.location.name}
-            layout="fill" // Ensures image fills container
-            objectFit="cover" // Crops image to cover container
-            className="transition-transform duration-500 hover:scale-105" // Subtle zoom on hover
-            priority // Prioritize loading for initial view
-          />
-          {/* Subtle gradient overlay on image for visual depth */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
+    <>
+      <AuthRequiredDialog open={isAuthRequiredDialogOpen} onClose={() => setIsAuthRequiredDialogOpen(false)} />
 
-          {/* Postage Stamp Like Button (Top Right of Image) */}
-          <button
-            onClick={handleLike}
-            className={`absolute top-5 right-5 w-16 h-16 rounded-sm border-2 border-dashed flex items-center justify-center p-2 z-10
-              transition-all duration-300 transform hover:scale-110 active:scale-95
-              ${isLiked 
-                ? 'bg-red-500 border-red-400 text-white shadow-md' 
-                : 'bg-white border-gray-300 text-gray-400 hover:border-red-300 hover:text-red-500 shadow-sm'
-              }`}
-            // CSS clip-path to create the postage stamp edge effect
-            style={{
-              clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))'
-            }}
-            aria-label="Like Post"
-          >
-            <Heart 
-              className={`w-7 h-7 transition-all duration-300 
-                ${isLiked ? 'fill-current text-current scale-125 animate-pop' : ''}`} 
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8 max-w-4xl min-w-full mx-auto transform transition-all duration-300 hover:shadow-xl relative group font-sans">
+        <div className="flex flex-col md:flex-row h-auto md:h-[400px]">
+          
+          {/* Image Section (Left Half on Desktop, Top Half on Mobile) */}
+          <div className="w-full md:w-1/2 h-64 md:h-full relative overflow-hidden rounded-t-2xl md:rounded-tr-none md:rounded-l-2xl">
+            <Image
+              src={post.imageUrl}
+              alt={post.location.name}
+              layout="fill"
+              objectFit="cover"
+              className="transition-transform duration-500 hover:scale-105"
+              priority
             />
-          </button>
-        </div>
-        
-        {/* Content Section (Right Half on Desktop, Bottom Half on Mobile) */}
-        <div className="w-full md:w-1/2 p-7 flex flex-col justify-between relative bg-white rounded-b-2xl md:rounded-r-2xl md:rounded-bl-none">
-          
-          {/* Post Header (Location & Explore Button) */}
-          <div className="mb-4">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-2 leading-tight">
-              {post.location.name}
-            </h2>
-            <button className="text-base text-green-600 hover:text-green-700 transition-colors duration-200 flex items-center gap-1.5 font-medium group">
-              <MapPin className="w-5 h-5 text-green-500 group-hover:text-green-600 transition-transform group-hover:scale-110" />
-              <span>Explore experiences here</span>
-            </button>
+           
+            <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
           </div>
           
-          {/* Post Caption */}
-          <div className="flex-1 overflow-hidden pr-2 mb-6">
-            <p className="text-gray-700 text-lg leading-relaxed">
-              {post.caption}
-            </p>
-          </div>
-          
-          {/* Footer (Author, Timestamp, Likes, Shares) */}
-          <div className="flex flex-col sm:flex-row items-center justify-between pt-5 border-t border-gray-100 gap-3 sm:gap-0">
-            <div className="text-sm text-gray-500 order-2 sm:order-1">
-              <span className="font-semibold text-gray-800">@{post.author.username}</span> • {formatTimestamp(post.createdAt)}
-            </div>
+          {/* Content Section (Right Half on Desktop, Bottom Half on Mobile) */}
+          <div className="w-full md:w-1/2 p-6 flex flex-col justify-between relative bg-white rounded-b-2xl md:rounded-r-2xl md:rounded-bl-none">
             
-            <div className="flex items-center gap-6 order-1 sm:order-2">
-              {/* Likes Counter */}
-              <div className="flex items-center gap-1.5 text-base text-gray-600 font-semibold">
-                <Heart className={`w-5 h-5 ${isLiked ? 'fill-green-500 text-green-500' : 'text-gray-400'}`} />
-                <span>{currentLikes.toLocaleString()}</span>
+            {/* Post Header (Location & Explore Link with Like Stamp) */}
+            <div className="mb-4 relative flex justify-between items-start">
+              <div> {/* Wrapper for location and explore link */}
+                <h2 className="text-2xl font-extrabold text-gray-900 mb-1 leading-tight">
+                  {post.location.name}
+                </h2>
+                <Link
+                  href="https://www.headout.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-primary hover:text-purple-700 transition-colors duration-200 font-medium group"
+                >
+                  <MapPin className="w-4 h-4 text-purple-500 group-hover:text-purple-600 transition-transform group-hover:scale-110" />
+                  <span>Explore experiences here</span>
+                </Link>
               </div>
-              
-              {/* Share Button with dynamic feedback */}
+
+            
               <button
-                onClick={handleShare}
-                disabled={isSharing}
-                className="flex items-center gap-1.5 text-base text-gray-600 hover:text-green-600 transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed group"
-                aria-label="Share Post"
+                onClick={handleLike}
+                disabled={isLikingLoading} 
+                className={`relative w-12 h-12 rounded-sm border-2 border-dashed flex-shrink-0
+                  transition-all duration-300 transform hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
+                  ${isLiked && !isLikingLoading // Apply liked style only if liked and not currently loading
+                    ? 'bg-primary border-primary text-primary-foreground' // Changed to primary theme
+                    : 'bg-white border-gray-300 text-gray-400 hover:border-primary hover:text-primary' // Changed hover to primary theme
+                  }`}
+                style={{
+                  clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))'
+                }}
+                aria-label="Like Post"
               >
-                {copyStatus === 'copying' ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-green-500" />
-                ) : copyStatus === 'copied' ? (
-                  <Check className="w-5 h-5 text-green-500" />
+                {isLikingLoading ? (
+                  <Loader2 className="w-5 h-5 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-spin text-gray-600" />
                 ) : (
-                  <Share className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                  <Heart
+                    className={`w-5 h-5 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300
+                      ${isLiked ? 'fill-current scale-110 animate-pop' : 'hover:scale-110'}`}
+                  />
                 )}
-                <span className="font-semibold">{currentShares}</span>
               </button>
             </div>
+            
+            {/* Post Caption */}
+            <div className="flex-1 overflow-hidden pr-2 mb-6">
+              <p className="text-gray-700 text-base leading-relaxed">
+                {post.caption}
+              </p>
+            </div>
+            
+            {/* Footer (Author, Timestamp, Likes, Shares) */}
+            <div className="flex flex-col sm:flex-row items-center justify-between pt-5 border-t border-gray-100 gap-3 sm:gap-0">
+              <div className="text-sm text-gray-500 order-2 sm:order-1">
+                <span className="font-semibold text-gray-800">@{post.author.username}</span> • <time dateTime={new Date(post.createdAt).toISOString()}>{displayTimestamp}</time>
+              </div>
+              
+              <div className="flex items-center gap-4 order-1 sm:order-2">
+               
+                <div className="flex items-center gap-1 text-base text-gray-600 font-semibold">
+                  <Heart className={`w-5 h-5 ${isLiked ? 'fill-primary text-primary' : 'text-gray-400'}`} /> 
+                  <span>{currentLikes.toLocaleString()}</span>
+                </div>
+                
+               
+                <button
+                  onClick={handleShare}
+                  disabled={isSharing}
+                  className="flex items-center gap-1 text-base text-gray-600 hover:text-green-600 transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed group"
+                  aria-label="Share Post"
+                >
+                  {copyStatus === 'copying' ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-green-500" />
+                  ) : copyStatus === 'copied' ? (
+                    <Check className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <Share className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                  )}
+                  <span className="font-semibold">{currentShares}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+        {postUrl && (
+            <input
+            type="text"
+            ref={shareLinkRef}
+            readOnly
+            className="absolute -left-full top-0"
+            value={postUrl}
+            />
+        )}
       </div>
-      {/* Hidden input for easy copying on non-share API devices */}
-      <input 
-        type="text" 
-        ref={shareLinkRef} 
-        readOnly 
-        className="absolute -left-full top-0" 
-        value={`${window.location.origin}/post/${post.id}`} 
-      />
-    </div>
+    </>
   );
 }

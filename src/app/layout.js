@@ -2,12 +2,13 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/myComponents/header";
 import UserProfileSync from "@/components/myComponents/userProfileSync";
+import { Toaster } from "sonner";
 
 const inter = Inter({subsets:["latin"]})
 
 export const metadata = {
   title: "Vistagram",
-  description: "Travel Instagram",
+  description: "Instagram for Travellers",
 };
 
 export default function RootLayout({ children }) {
@@ -16,10 +17,10 @@ export default function RootLayout({ children }) {
       <body
         className={`${inter.className}  scroll-smooth`}
       >
+        <Toaster />
          <Header/>
-         {/* <UserProfileSync/> */}
-        {/* <main className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 pt-30"> */}
-        <main className="min-h-screen bg-background pt-30">
+      
+        <main className="min-h-screen bg-background pt-28">
            {children}
         </main>
       </body>

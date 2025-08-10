@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-// 1. Import the necessary hooks from 'react-dom' for Server Actions
+
 import { useFormState, useFormStatus } from 'react-dom';
 
 // The SubmitButton must be a separate component to use the useFormStatus hook.
@@ -40,13 +40,11 @@ function SubmitButton() {
 }
 
 export default function SignIn() {
-  // 2. useFormState manages the form's state.
-  // It takes the server action (signInHandler) and an initial state.
-  // It returns the current state and a new function to call the action.
+
   const [state, formAction] = useFormState(signInHandler, { error: null });
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100 p-4">
+    <div className="flex justify-center items-center  bg-background p-4 pt-0 md:pt-2 ">
       <Card className="w-full max-w-md overflow-hidden shadow-xl pt-0">
         <div className="relative w-full h-48">
           <Image 
@@ -65,8 +63,7 @@ export default function SignIn() {
         </CardHeader>
 
         <CardContent>
-          {/* 3. The form's 'action' prop is now bound to our formAction.
-             This ensures Next.js handles the submission correctly. */}
+        
           <form action={formAction} className="space-y-4">
             <div className="space-y-1">
               <label htmlFor="email" className="text-sm">Email</label>
@@ -87,8 +84,7 @@ export default function SignIn() {
               />
             </div>
 
-            {/* 4. Display the error message from the 'state' object.
-               The 'state' is updated with whatever the server action returns. */}
+            {/* Display the error message */}
             {state?.error?.message && <p className="text-red-600 text-sm font-semibold text-center">{state.error.message}</p>}
 
             <SubmitButton />

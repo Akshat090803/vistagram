@@ -5,22 +5,34 @@ import { createClient } from "@/utils/supabase/server";
 
 import { randomUUID } from "crypto";
 
-export async function createPostServer({ file, caption, locationName }) {
+export async function createPostServer(prevState, formData) { 
   const supabase = await createClient();
 
   // 1. Check authenticated user
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
-    throw new Error("Unauthorized. Please log in.");
+    return { success: false, error: { message: "Unauthorized. Please log in." } };
   }
 
-  // 2. Find our DB user
+  // 2. Find user in DB 
   const dbUser = await prisma.user.findUnique({
     where: { supabaseId: user.id },
   });
-  if (!dbUser) throw new Error("User not found in database.");
+  if (!dbUser) return { success: false, error: { message: "User not found in database." } };
 
-  // 3. Check or create location
+  // Extract data from FormData
+  const file = formData.get('image');
+  const caption = formData.get('caption');
+  const locationName = formData.get('locationName');
+
+  if (!file) {
+    return { success: false, error: { message: "No image file provided." } };
+  }
+  if (!locationName) {
+    return { success: false, error: { message: "Location cannot be empty." } };
+  }
+
+  // Check or create location
   let location = await prisma.location.findUnique({
     where: { name: locationName },
   });
@@ -28,34 +40,38 @@ export async function createPostServer({ file, caption, locationName }) {
     location = await prisma.location.create({ data: { name: locationName } });
   }
 
-  // 4. Upload image to Supabase Storage
+  // Upload image to Supabase Storage
   const fileExt = file.name.split(".").pop();
   const filePath = `posts/${randomUUID()}.${fileExt}`;
 
   const { error: uploadError } = await supabase.storage
-    .from("post-images")
+    .from("vistagram-images")
     .upload(filePath, file, {
       contentType: file.type,
     });
 
-  if (uploadError) throw new Error(uploadError.message);
+  if (uploadError) return { success: false, error: { message: uploadError.message } };
 
-  // 5. Get public URL
+  //  Get public URL
   const { data: publicUrlData } = supabase.storage
-    .from("post-images")
+    .from("vistagram-images")
     .getPublicUrl(filePath);
 
   const imageUrl = publicUrlData.publicUrl;
 
-  // 6. Save post in DB
-  await prisma.post.create({
-    data: {
-      imageUrl,
-      caption,
-      authorId: dbUser.id,
-      locationId: location.id,
-    },
-  });
-
-  return { success: true };
+  //  Save post in DB
+  try {
+    await prisma.post.create({
+      data: {
+        imageUrl,
+        caption: caption || null,
+        authorId: dbUser.id,
+        locationId: location.id,
+      },
+    });
+    return { success: true, error: null }; 
+  } catch (dbError) {
+    console.error("Database error creating post:", dbError);
+    return { success: false, error: { message: "Failed to save post to database." } };
+  }
 }

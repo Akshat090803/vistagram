@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useFormState, useFormStatus } from 'react-dom';
 
 // A separate component for the submit button to use the useFormStatus hook
+//use form status form status of parent 
 function SubmitButton() {
   const { pending } = useFormStatus();
 
@@ -39,11 +40,11 @@ function SubmitButton() {
 }
 
 export default function SignUp() {
-  // useFormState hook to manage the form state and server action result
+
   const [state, formAction] = useFormState(signupHandler, { error: null });
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100 p-4">
+    <div className="flex justify-center items-center  bg-background p-4 pt-0 md:pt-2">
       <Card className="w-full max-w-md overflow-hidden shadow-xl pt-0">
         <div className="relative w-full h-48">
           <Image 

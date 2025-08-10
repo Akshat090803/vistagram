@@ -21,6 +21,7 @@ model User {
   firstTime Boolean  @default(true) //this is to show Intro cards to first time user
   createdAt DateTime @default(now())
   posts     Post[]
+  likedPosts PostLike[] 
 }
 
 // 2. Location Model  (For story feature like in Instagram)
@@ -29,6 +30,8 @@ model Location {
   name  String @unique
   
   posts Post[]
+
+   
 }
 
 // 3. Post Model
@@ -45,6 +48,20 @@ model Post {
   
   location   Location @relation(fields: [locationId], references: [id])
   locationId String
-
+   
+    likedBy    PostLike[] // New: Relation to PostLike model
   @@index([createdAt]) //as feed needs to sorted in descending order
+}
+
+// 4 Post Like
+model PostLike {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId]) // A user can only like a post once
 }

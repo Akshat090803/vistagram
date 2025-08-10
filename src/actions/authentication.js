@@ -2,10 +2,10 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { db } from '@/lib/prisma' // Assuming this is your Prisma client instance
+import { db } from '@/lib/prisma' 
 import { redirect } from 'next/navigation'
 
-// The function signature is updated to work with useFormState
+
 export async function signupHandler(prevState, formData) {
   const supabase = await createClient()
 
@@ -28,7 +28,6 @@ export async function signupHandler(prevState, formData) {
     })
 
     if (existingUser) {
-      // This structure matches what the client component expects
       return { error: { username: 'This username is already taken. Please choose another.' } }
     }
   } catch (prismaError) {
@@ -46,7 +45,7 @@ export async function signupHandler(prevState, formData) {
     return { error: { message: signUpError.message } }
   }
 
-  // If Supabase sign-up is successful, create the user profile in your Prisma DB
+  // If Supabase sign-up is successful, create the user profile in DB
   if (signUpData.user) {
     try {
       await db.user.create({
@@ -69,7 +68,7 @@ export async function signupHandler(prevState, formData) {
 
 
 // --- Sign In handler ---
-// The function signature is also updated here
+
 export async function signInHandler(prevState, formData) {
   const supabase = await createClient()
 
@@ -78,7 +77,7 @@ export async function signInHandler(prevState, formData) {
     password: formData.get('password'),
   }
 
-  // Correctly check for only email and password
+  // check for only email and password
   if (!data.email || !data.password) {
     return { error: { message: 'Email and password are required.' } }
   }
@@ -93,4 +92,17 @@ export async function signInHandler(prevState, formData) {
   }
 
   redirect('/')
+}
+
+
+export async function signOutHandler() {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    console.error("Error signing out:", error.message);
+    
+  }
+
+  redirect('/login'); // Redirect to login page after logout
 }

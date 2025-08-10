@@ -1,6 +1,6 @@
 import fs from 'fs';
 import Papa from 'papaparse';
-import { db } from '../../src/lib/prisma'; // adjust path
+import { db } from '../../src/lib/prisma'; 
 
 
 async function main() {

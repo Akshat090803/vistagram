@@ -16,7 +16,7 @@ export default async function Header() {
 
       // console.log("User loged In --- for debugging")
       
-      console.log("Data.....",data)
+      // console.log("Data.....",data)
       user = data?.user; 
     } catch (error) {
       console.error("Error getting user in Header:", error);
