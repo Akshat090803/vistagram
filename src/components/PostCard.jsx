@@ -477,7 +477,11 @@ export default function PostCard({ post }) {
                   disabled={isLikingLoading} 
                   className="flex items-center gap-1 text-base text-gray-600 hover:text-primary transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer group" 
                 >
-                  <Heart className={`w-5 h-5 ${isLiked ? 'fill-primary text-primary' : 'text-gray-400'}`} />
+                  
+                  {
+                    !isLikingLoading ? <Heart className={`w-5 h-5 ${isLiked ? 'fill-primary text-primary' : 'text-gray-400'}`} /> : <Loader2 className="w-5 h-5 animate-spin text-green-500" />
+                  }
+                  
                   <span>{currentLikes.toLocaleString()}</span>
                 </button>
                 
