@@ -54,10 +54,10 @@ bun install
 Create a `.env` file in the root of the project and add the following environment variables. These are crucial for connecting to your Supabase project and database.
 
 ```env
-DATABASE_URL="postgresql://postgres.dummyuser:dummyPassword123@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.dummyuser:dummyPassword123@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
-NEXT_PUBLIC_SUPABASE_URL="https://dummyproject.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1bW15cHJvamVjdCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzU0NzU2Mzg1LCJleHAiOjIwNzAzMzIzODV9.dummyKey1234567890abcdef"
+DATABASE_URL="your_db_url"
+DIRECT_URL="your_db_url"
+NEXT_PUBLIC_SUPABASE_URL="your_supabase_url"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your_supabase_anon_key"
 ```
 
 > **Note**: For a production environment or shared development, replace these dummy values with your own Supabase project keys and database URLs.
