@@ -21,7 +21,7 @@ export default function AuthRequiredDialog({ open, onClose }) {
             onClose(); // Immediately start closing the dialog
             // Defer navigation to the next event loop tick to avoid render conflicts
             setTimeout(() => {
-              router.push('/sign-in');
+              router.push('/login');
             }, 0);
             return 0;
           }
@@ -37,7 +37,7 @@ export default function AuthRequiredDialog({ open, onClose }) {
     onClose(); // Close dialog first
     // Defer navigation for consistency and to avoid render conflicts
     setTimeout(() => {
-      router.push('/sign-in');
+      router.push('/login');
     }, 0);
   };
   return (
