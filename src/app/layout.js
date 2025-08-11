@@ -17,7 +17,7 @@ export default function RootLayout({ children }) {
       <body
         className={`${inter.className}  scroll-smooth`}
       >
-        <Toaster />
+        <Toaster richColors={true} />
          <Header/>
       
         <main className="min-h-screen bg-background pt-28">

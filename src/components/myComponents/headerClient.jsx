@@ -1,21 +1,32 @@
 'use client';
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; 
 import Link from 'next/link';
 import { Camera, UserCircle } from 'lucide-react';
 import CreatePostDialog from '@/components/CreatePostDialog';
 import AuthRequiredDialog from '@/components/AuthRequiredDialog';
 import UserProfileDialog from '@/components/UserProfileDialog';
-import { usePathname } from 'next/navigation'; 
+import { usePathname, useRouter } from 'next/navigation'; 
 
 export default function HeaderClient({ user }) {
   const pathname = usePathname();
+  const router = useRouter(); 
 
   const hideButtonsRoutes = ['/login', '/sign-up'];
+  // DAuthenticated users can't visit this oages
+  const restrictedAuthRoutes = ['/login', '/sign-up'];
+
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isAuthRequiredDialogOpen, setIsAuthRequiredDialogOpen] = useState(false);
   const [isUserProfileDialogOpen, setIsUserProfileDialogOpen] = useState(false);
+
+  // Effect to redirect authenticated users from login/signup pages
+  useEffect(() => {
+    if (user && restrictedAuthRoutes.includes(pathname)) {
+      // If user is logged in and on a restricted auth page, redirect to home
+      router.replace('/');
+    }
+  }, [user, pathname, router, restrictedAuthRoutes]); // Dependencies for the effect
 
   const handleUploadClick = () => {
     if (!user) {
@@ -42,14 +53,14 @@ export default function HeaderClient({ user }) {
           "The world is a book, and those who do not travel read only one page."
         </span>
         {/* Shorter text for small screens */}
-        <span className="block md:hidden text-xs font-medium px-2"> 
+        <span className="block md:hidden text-xs font-medium px-2">
           "Explore. Dream. Discover."
         </span>
       </div>
     );
   }
 
-
+  // Render buttons and dialogs for other paths
   return (
     <>
       <CreatePostDialog open={isUploadDialogOpen} onClose={() => setIsUploadDialogOpen(false)} user={user} />
@@ -59,7 +70,7 @@ export default function HeaderClient({ user }) {
       <div className="flex items-center space-x-4">
         <button
           onClick={handleUploadClick}
-          className="flex items-center justify-center px-4 py-2 text-sm font-medium rounded-full text-white bg-purple-600 hover:bg-purple-700 transition-all cursor-pointer"
+          className="flex items-center justify-center px-4 py-2 text-sm font-medium rounded-full text-white bg-purple-600 hover:bg-purple-700 transition-all"
         >
           <Camera className="h-5 w-5 mr-0 lg:mr-2" />
           <span className="hidden lg:block">Share</span>

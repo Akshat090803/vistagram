@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Globe, Plane, ArrowRight } from 'lucide-react'; 
+import { Globe, Plane, ArrowRight } from 'lucide-react';
 
 export default function AuthRequiredDialog({ open, onClose }) {
   const [countdown, setCountdown] = useState(10);
@@ -13,13 +13,16 @@ export default function AuthRequiredDialog({ open, onClose }) {
   useEffect(() => {
     let timerId;
     if (open) {
-      setCountdown(10); 
+      setCountdown(10);
       timerId = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timerId);
-            router.push('/login'); 
-            onClose(); 
+            onClose(); // Immediately start closing the dialog
+            // Defer navigation to the next event loop tick to avoid render conflicts
+            setTimeout(() => {
+              router.push('/sign-in');
+            }, 0);
             return 0;
           }
           return prev - 1;
@@ -27,15 +30,16 @@ export default function AuthRequiredDialog({ open, onClose }) {
       }, 1000);
     }
 
-    // Cleanup timer on component unmount or when dialog closes
     return () => clearInterval(timerId);
-  }, [open, router, onClose]); 
+  }, [open, router, onClose]);
 
   const handleGoToSignIn = () => {
-    router.push('/login');
-    onClose(); // Close the dialog immediately
+    onClose(); // Close dialog first
+    // Defer navigation for consistency and to avoid render conflicts
+    setTimeout(() => {
+      router.push('/sign-in');
+    }, 0);
   };
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
